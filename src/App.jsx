@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import html2canvas from 'html2canvas'
 import { Plus, Share, Download, Calendar, Trash2, Wallet, ArrowUpRight, History } from 'lucide-react'
+import { subscribe, saveEntries, saveSectors, seedFromLocalStorage } from './db.js'
 
 const DEFAULT_SECTORS = [
   'VGrand Restaurant',
@@ -9,11 +10,6 @@ const DEFAULT_SECTORS = [
   'Mining',
   'Softshape.ai',
 ]
-
-const STORAGE_KEYS = {
-  entries: 'pet_entries_v1',
-  sectors: 'pet_sectors_v1',
-}
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-IN', {
@@ -42,21 +38,6 @@ function formatDate(iso) {
   })
 }
 
-function loadJSON(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : fallback
-  } catch {
-    return fallback
-  }
-}
-
-function saveJSON(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value))
-  } catch {}
-}
-
 function nowLocalInput() {
   const d = new Date()
   d.setSeconds(0, 0)
@@ -74,10 +55,11 @@ function isSameDay(a, b) {
 }
 
 export default function App() {
-  const [entries, setEntries] = useState(() => loadJSON(STORAGE_KEYS.entries, []))
-  const [sectors, setSectors] = useState(() => loadJSON(STORAGE_KEYS.sectors, DEFAULT_SECTORS))
+  const [entries, setEntries] = useState([])
+  const [sectors, setSectors] = useState(DEFAULT_SECTORS)
+  const [loading, setLoading] = useState(true)
 
-  const [selectedSector, setSelectedSector] = useState(sectors[0] || '')
+  const [selectedSector, setSelectedSector] = useState(DEFAULT_SECTORS[0] || '')
   const [reason, setReason] = useState('')
   const [amount, setAmount] = useState('')
   const [transferredTo, setTransferredTo] = useState('')
@@ -91,11 +73,30 @@ export default function App() {
   const receiptRef = useRef(null)
 
   useEffect(() => {
-    saveJSON(STORAGE_KEYS.entries, entries)
+    let mounted = true
+    let unsub = () => {}
+
+    seedFromLocalStorage(DEFAULT_SECTORS).then(() => {
+      if (!mounted) return
+      unsub = subscribe((data) => {
+        setEntries(data.entries || [])
+        if (data.sectors) setSectors(data.sectors)
+        setLoading(false)
+      })
+    })
+
+    return () => {
+      mounted = false
+      unsub()
+    }
+  }, [])
+
+  useEffect(() => {
+    saveEntries(entries)
   }, [entries])
 
   useEffect(() => {
-    saveJSON(STORAGE_KEYS.sectors, sectors)
+    saveSectors(sectors)
     if (!sectors.includes(selectedSector)) {
       setSelectedSector(sectors[0] || '')
     }
@@ -248,6 +249,14 @@ export default function App() {
   }
 
   const latestEntry = justSaved || entries[0]
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+        <p className="text-neutral-500 text-sm">Loading…</p>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50 pb-24">
