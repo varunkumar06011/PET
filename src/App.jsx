@@ -47,6 +47,58 @@ function startOfDay(iso) {
   return d
 }
 
+function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.7) {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let { width, height } = img
+        if (width > height) {
+          if (width > maxWidth) {
+            height *= maxWidth / width
+            width = maxWidth
+          }
+        } else {
+          if (height > maxHeight) {
+            width *= maxHeight / height
+            height = maxHeight
+          }
+        }
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.src = e.target.result
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
+function dataURLtoBlob(dataURL) {
+  const byteString = atob(dataURL.split(',')[1])
+  const mime = dataURL.split(',')[0].split(':')[1].split(';')[0]
+  const ab = new ArrayBuffer(byteString.length)
+  const ia = new Uint8Array(ab)
+  for (let i = 0; i < byteString.length; i++) {
+    ia[i] = byteString.charCodeAt(i)
+  }
+  return new Blob([ab], { type: mime })
+}
+
+function formatDateTime(iso) {
+  return new Date(iso).toLocaleString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 export default function App() {
   const [entries, setEntries] = useState([])
   const [sectors, setSectors] = useState(DEFAULT_SECTORS)
@@ -57,6 +109,7 @@ export default function App() {
   const [amount, setAmount] = useState('')
   const [transferredTo, setTransferredTo] = useState('')
   const [dateTime, setDateTime] = useState(() => nowLocalInput())
+  const [billImage, setBillImage] = useState(null)
 
   const [filterPreset, setFilterPreset] = useState('today')
   const [customStart, setCustomStart] = useState(() => nowLocalInput().slice(0, 10))
@@ -177,24 +230,34 @@ export default function App() {
     URL.revokeObjectURL(url)
   }
 
-  async function shareEntry(entry, blob) {
+  async function shareEntry(entry, blob, viaWhatsApp = false) {
     const text = `*Expense Receipt*\nSector: ${entry.sector}\nAmount: ${formatCurrency(entry.amount)}\nReason: ${entry.reason}${entry.transferredTo ? '\nTransferred to: ' + entry.transferredTo : ''}\nDate: ${formatDateTime(entry.timestamp)}`
-    const file = new File([blob], `receipt-${entry.id}.png`, { type: 'image/png' })
+    const files = [new File([blob], `receipt-${entry.id}.png`, { type: 'image/png' })]
+    if (entry.billImage) {
+      files.push(new File([dataURLtoBlob(entry.billImage)], `bill-${entry.id}.jpg`, { type: 'image/jpeg' }))
+    }
 
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    const canShareFiles = navigator.canShare && navigator.canShare({ files })
+
+    if (canShareFiles) {
       try {
-        await navigator.share({ files: [file], text })
+        await navigator.share({ files, text })
         return
       } catch {}
     }
 
-    if (navigator.share) {
+    if (!viaWhatsApp && navigator.share) {
       try {
         await navigator.share({ text })
         return
       } catch {}
     }
 
+    // Fallback: download images, then open WhatsApp with text
+    downloadBlob(blob, `receipt-${entry.id}.png`)
+    if (entry.billImage) {
+      downloadBlob(dataURLtoBlob(entry.billImage), `bill-${entry.id}.jpg`)
+    }
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
   }
 
@@ -210,6 +273,7 @@ export default function App() {
       amount: Number(amount),
       transferredTo: transferredTo.trim(),
       timestamp: new Date(dateTime).toISOString(),
+      billImage,
     }
 
     setEntries((prev) => [entry, ...prev])
@@ -217,6 +281,7 @@ export default function App() {
     setAmount('')
     setTransferredTo('')
     setDateTime(nowLocalInput())
+    setBillImage(null)
     setJustSaved(entry)
 
     // Wait for receipt DOM to update, then generate image and download
@@ -236,10 +301,27 @@ export default function App() {
     }, 100)
   }
 
+  async function handleImageUpload(file) {
+    if (!file) return
+    const compressed = await compressImage(file, 800, 800, 0.7)
+    setBillImage(compressed)
+  }
+
+  function handleClearImage() {
+    setBillImage(null)
+  }
+
   function handleDelete(entryId) {
     if (window.confirm('Delete this entry?')) {
       setEntries((prev) => prev.filter((e) => e.id !== entryId))
     }
+  }
+
+  async function shareLatestViaWhatsApp() {
+    const entry = latestEntry
+    if (!entry) return
+    const blob = await generateImage(entry)
+    if (blob) await shareEntry(entry, blob, true)
   }
 
   const latestEntry = justSaved || entries[0]
@@ -271,19 +353,33 @@ export default function App() {
               amount={amount}
               transferredTo={transferredTo}
               dateTime={dateTime}
+              billImage={billImage}
               canSubmit={!!selectedSector && !!reason.trim() && !!amount && Number(amount) > 0}
               onReasonChange={setReason}
               onAmountChange={setAmount}
               onTransferredToChange={setTransferredTo}
               onDateTimeChange={setDateTime}
+              onImageChange={handleImageUpload}
+              onClearImage={handleClearImage}
               onSubmit={handleSave}
             />
           </div>
         </section>
 
-        <section>
-          <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3">Receipt Preview</h2>
+        <section className="space-y-3">
+          <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-1">Receipt Preview</h2>
           <ReceiptCard entry={latestEntry} ref={receiptRef} />
+          {latestEntry && (
+            <button
+              onClick={shareLatestViaWhatsApp}
+              className="w-full py-3.5 rounded-2xl bg-emerald-600 text-white font-semibold flex items-center justify-center gap-2 hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.564 6.893H5.835a2.154 2.154 0 0 1-2.154-2.154V5.835A2.154 2.154 0 0 1 5.835 3.68h12.33a2.154 2.154 0 0 1 2.154 2.154v12.33a2.154 2.154 0 0 1-2.154 2.154z"/>
+              </svg>
+              Send via WhatsApp
+            </button>
+          )}
         </section>
 
         <section className="bg-white rounded-3xl shadow-sm border border-slate-100 p-5">

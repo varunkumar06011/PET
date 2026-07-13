@@ -1,4 +1,4 @@
-import { Share, Trash2, History as HistoryIcon, Receipt } from 'lucide-react'
+import { Share, Trash2, History as HistoryIcon, Receipt, Camera } from 'lucide-react'
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)
@@ -38,7 +38,10 @@ export default function ExpenseHistory({ entries, onShare, onDelete }) {
                 className="flex items-center justify-between p-4 border-b border-slate-50 last:border-0"
               >
                 <div className="min-w-0 flex-1 pr-3">
-                  <p className="font-semibold text-slate-900 truncate">{entry.reason}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-slate-900 truncate">{entry.reason}</p>
+                    {entry.billImage && <Camera size={14} className="text-emerald-600 shrink-0" />}
+                  </div>
                   <p className="text-xs text-slate-500 truncate mt-0.5">
                     {entry.sector}
                     {entry.transferredTo ? ` · ${entry.transferredTo}` : ''}

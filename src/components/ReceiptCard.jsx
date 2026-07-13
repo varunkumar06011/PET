@@ -53,6 +53,12 @@ function ReceiptCard({ entry }, ref) {
           <span className="font-semibold text-slate-900 text-right">{dt}</span>
         </div>
       </div>
+      {entry.billImage && (
+        <div className="mt-4">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Bill Image</p>
+          <img src={entry.billImage} alt="Bill" className="w-full rounded-xl border border-slate-200 object-cover max-h-48" />
+        </div>
+      )}
       <div className="mt-5 pt-4 border-t-2 border-dashed border-slate-300 text-center text-[10px] text-slate-400 uppercase tracking-wider">
         Personal Expenditure Tracker
       </div>
