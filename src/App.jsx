@@ -9,6 +9,7 @@ import FilterTabs from './components/FilterTabs.jsx'
 import Breakdown from './components/Breakdown.jsx'
 import DailyReport from './components/DailyReport.jsx'
 import History from './components/History.jsx'
+import SearchBar from './components/SearchBar.jsx'
 
 const DEFAULT_SECTORS = [
   'VGrand Restaurant',
@@ -60,6 +61,7 @@ export default function App() {
   const [filterPreset, setFilterPreset] = useState('today')
   const [customStart, setCustomStart] = useState(() => nowLocalInput().slice(0, 10))
   const [customEnd, setCustomEnd] = useState(() => nowLocalInput().slice(0, 10))
+  const [searchQuery, setSearchQuery] = useState('')
 
   const [justSaved, setJustSaved] = useState(null)
   const receiptRef = useRef(null)
@@ -135,15 +137,15 @@ export default function App() {
     [filteredEntries]
   )
 
-  const groupedHistory = useMemo(() => {
-    const days = {}
-    for (const e of filteredEntries.slice().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))) {
-      const key = new Date(e.timestamp).toDateString()
-      days[key] = days[key] || []
-      days[key].push(e)
-    }
-    return Object.entries(days)
-  }, [filteredEntries])
+  const searchedEntries = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return filteredEntries
+    return filteredEntries.filter((e) =>
+      e.reason.toLowerCase().includes(q) ||
+      e.sector.toLowerCase().includes(q) ||
+      (e.transferredTo && e.transferredTo.toLowerCase().includes(q))
+    )
+  }, [filteredEntries, searchQuery])
 
   function handleAddSector() {
     const name = window.prompt('New sector name')
@@ -311,9 +313,10 @@ export default function App() {
 
         <Breakdown totalsBySector={totalsBySector} total={total} />
 
-        <section>
-          <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3">History</h2>
-          <History entries={filteredEntries} onShare={handleSharePast} onDelete={handleDelete} />
+        <section className="space-y-3">
+          <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-1">History</h2>
+          <SearchBar value={searchQuery} onChange={setSearchQuery} />
+          <History entries={searchedEntries} onShare={handleSharePast} onDelete={handleDelete} />
         </section>
       </main>
     </div>

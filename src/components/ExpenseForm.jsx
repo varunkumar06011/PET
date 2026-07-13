@@ -32,8 +32,10 @@ export default function ExpenseForm({
           <input
             type="number"
             inputMode="decimal"
+            min="0"
             value={amount}
-            onChange={(e) => onAmountChange(e.target.value)}
+            onChange={(e) => onAmountChange(e.target.value.replace(/^-/, ''))}
+            onWheel={(e) => e.target.blur()}
             placeholder="0"
             className="w-full pl-10 pr-4 py-3.5 rounded-2xl bg-white border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none text-xl font-bold transition-all"
           />
