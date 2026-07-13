@@ -109,6 +109,7 @@ export default function App() {
   const [amount, setAmount] = useState('')
   const [transferredTo, setTransferredTo] = useState('')
   const [dateTime, setDateTime] = useState(() => nowLocalInput())
+  const [notes, setNotes] = useState('')
   const [billImage, setBillImage] = useState(null)
 
   const [filterPreset, setFilterPreset] = useState('today')
@@ -261,6 +262,15 @@ export default function App() {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
   }
 
+  function generateExpenseId() {
+    const date = new Date()
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, '0')
+    const d = String(date.getDate()).padStart(2, '0')
+    const rand = Math.floor(1000 + Math.random() * 9000)
+    return `EXP-${y}${m}${d}-${rand}`
+  }
+
   async function handleSave() {
     if (!selectedSector || !reason.trim() || !amount || Number(amount) <= 0) return
 
@@ -268,10 +278,12 @@ export default function App() {
       id: typeof crypto !== 'undefined' && crypto.randomUUID
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      expenseId: generateExpenseId(),
       sector: selectedSector,
       reason: reason.trim(),
       amount: Number(amount),
       transferredTo: transferredTo.trim(),
+      notes: notes.trim(),
       timestamp: new Date(dateTime).toISOString(),
       billImage,
     }
@@ -280,6 +292,7 @@ export default function App() {
     setReason('')
     setAmount('')
     setTransferredTo('')
+    setNotes('')
     setDateTime(nowLocalInput())
     setBillImage(null)
     setJustSaved(entry)
@@ -353,12 +366,14 @@ export default function App() {
               amount={amount}
               transferredTo={transferredTo}
               dateTime={dateTime}
+              notes={notes}
               billImage={billImage}
               canSubmit={!!selectedSector && !!reason.trim() && !!amount && Number(amount) > 0}
               onReasonChange={setReason}
               onAmountChange={setAmount}
               onTransferredToChange={setTransferredTo}
               onDateTimeChange={setDateTime}
+              onNotesChange={setNotes}
               onImageChange={handleImageUpload}
               onClearImage={handleClearImage}
               onSubmit={handleSave}
@@ -368,7 +383,9 @@ export default function App() {
 
         <section className="space-y-3">
           <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-1">Receipt Preview</h2>
-          <ReceiptCard entry={latestEntry} ref={receiptRef} />
+          <div className="overflow-x-auto pb-2 -mx-4 px-4">
+            <ReceiptCard entry={latestEntry} ref={receiptRef} />
+          </div>
           {latestEntry && (
             <button
               onClick={shareLatestViaWhatsApp}

@@ -5,12 +5,14 @@ export default function ExpenseForm({
   amount,
   transferredTo,
   dateTime,
+  notes,
   billImage,
   canSubmit,
   onReasonChange,
   onAmountChange,
   onTransferredToChange,
   onDateTimeChange,
+  onNotesChange,
   onImageChange,
   onClearImage,
   onSubmit,
@@ -63,6 +65,17 @@ export default function ExpenseForm({
           value={dateTime}
           onChange={(e) => onDateTimeChange(e.target.value)}
           className="w-full px-4 py-3.5 rounded-2xl bg-white border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none text-base transition-all"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Notes <span className="text-slate-400 normal-case">(optional)</span></label>
+        <textarea
+          value={notes}
+          onChange={(e) => onNotesChange(e.target.value)}
+          placeholder="Add any extra details..."
+          rows={3}
+          className="w-full px-4 py-3.5 rounded-2xl bg-white border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none text-base transition-all resize-none"
         />
       </div>
 
