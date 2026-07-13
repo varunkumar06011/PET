@@ -383,9 +383,14 @@ export default function App() {
 
         <section className="space-y-3">
           <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-1">Receipt Preview</h2>
-          <div className="overflow-x-auto pb-2 -mx-4 px-4">
-            <ReceiptCard entry={latestEntry} ref={receiptRef} />
+          <div className="pb-2">
+            <ReceiptCard entry={latestEntry} compact />
           </div>
+          {latestEntry && (
+            <div className="fixed -left-[9999px] top-0">
+              <ReceiptCard entry={latestEntry} ref={receiptRef} />
+            </div>
+          )}
           {latestEntry && (
             <button
               onClick={shareLatestViaWhatsApp}
