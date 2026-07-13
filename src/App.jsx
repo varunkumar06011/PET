@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import html2canvas from 'html2canvas'
-import { Plus, Share, Download, Calendar, Trash2, Wallet, ArrowUpRight, History } from 'lucide-react'
 import { subscribe, saveEntries, saveSectors, seedFromLocalStorage } from './db.js'
+import Header from './components/Header.jsx'
+import SectorChips from './components/SectorChips.jsx'
+import ExpenseForm from './components/ExpenseForm.jsx'
+import ReceiptCard from './components/ReceiptCard.jsx'
+import FilterTabs from './components/FilterTabs.jsx'
+import Breakdown from './components/Breakdown.jsx'
+import DailyReport from './components/DailyReport.jsx'
+import History from './components/History.jsx'
 
 const DEFAULT_SECTORS = [
   'VGrand Restaurant',
@@ -17,17 +24,6 @@ function formatCurrency(amount) {
     currency: 'INR',
     maximumFractionDigits: 0,
   }).format(amount)
-}
-
-function formatDateTime(iso) {
-  const d = new Date(iso)
-  return d.toLocaleString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 }
 
 function formatDate(iso) {
@@ -48,10 +44,6 @@ function startOfDay(iso) {
   const d = new Date(iso)
   d.setHours(0, 0, 0, 0)
   return d
-}
-
-function isSameDay(a, b) {
-  return startOfDay(a).getTime() === startOfDay(b).getTime()
 }
 
 export default function App() {
@@ -249,297 +241,81 @@ export default function App() {
   }
 
   const latestEntry = justSaved || entries[0]
+  const filterLabel = filterPreset === 'today' ? 'Today' : filterPreset === 'week' ? 'This Week' : filterPreset === 'month' ? 'This Month' : 'Range'
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
-        <p className="text-neutral-500 text-sm">Loading…</p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <p className="text-slate-500 text-sm font-medium">Loading…</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 pb-24">
-      <header className="bg-white border-b border-neutral-100 sticky top-0 z-10">
-        <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-neutral-900">Expenses</h1>
-            <p className="text-xs text-neutral-500">Vinod Kumar</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-neutral-500">Total ({filterPreset === 'today' ? 'Today' : filterPreset === 'week' ? 'This Week' : filterPreset === 'month' ? 'This Month' : 'Range'})</p>
-            <p className="text-xl font-bold text-brand-600">{formatCurrency(total)}</p>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-slate-50 pb-24">
+      <Header total={formatCurrency(total)} filterLabel={filterLabel} />
 
-      <main className="max-w-md mx-auto px-4 pt-4 space-y-4">
-        {/* Entry form */}
-        <section className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-4">
-          <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar mb-4 pb-1">
-            {sectors.map((s) => (
-              <button
-                key={s}
-                onClick={() => setSelectedSector(s)}
-                className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  selectedSector === s
-                    ? 'bg-brand-600 text-white'
-                    : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-            <button
-              onClick={handleAddSector}
-              className="flex items-center gap-1 px-3 py-2 rounded-full text-sm font-medium bg-neutral-900 text-white hover:bg-neutral-800 shrink-0"
-            >
-              <Plus size={16} /> New
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            <input
-              type="text"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Reason — e.g. Cement delivery"
-              className="w-full px-4 py-3 rounded-xl bg-neutral-50 border border-neutral-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none text-base"
+      <main className="max-w-md mx-auto px-4 pt-5 space-y-6">
+        <section className="bg-white rounded-3xl shadow-sm border border-slate-100 p-5">
+          <SectorChips
+            sectors={sectors}
+            selected={selectedSector}
+            onSelect={setSelectedSector}
+            onAdd={handleAddSector}
+          />
+          <div className="mt-5">
+            <ExpenseForm
+              reason={reason}
+              amount={amount}
+              transferredTo={transferredTo}
+              dateTime={dateTime}
+              canSubmit={!!selectedSector && !!reason.trim() && !!amount && Number(amount) > 0}
+              onReasonChange={setReason}
+              onAmountChange={setAmount}
+              onTransferredToChange={setTransferredTo}
+              onDateTimeChange={setDateTime}
+              onSubmit={handleSave}
             />
-
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500 font-medium">₹</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="Amount"
-                className="w-full pl-9 pr-4 py-3 rounded-xl bg-neutral-50 border border-neutral-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none text-lg font-semibold"
-              />
-            </div>
-
-            <input
-              type="text"
-              value={transferredTo}
-              onChange={(e) => setTransferredTo(e.target.value)}
-              placeholder="Transferred to (optional)"
-              className="w-full px-4 py-3 rounded-xl bg-neutral-50 border border-neutral-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none text-base"
-            />
-
-            <input
-              type="datetime-local"
-              value={dateTime}
-              onChange={(e) => setDateTime(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-neutral-50 border border-neutral-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none text-base"
-            />
-
-            <button
-              onClick={handleSave}
-              disabled={!selectedSector || !reason.trim() || !amount || Number(amount) <= 0}
-              className="w-full py-4 rounded-xl bg-brand-600 text-white font-semibold text-lg hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-            >
-              <Wallet size={20} /> Save Expense
-            </button>
           </div>
         </section>
 
-        {/* Receipt card used for image generation */}
-        {latestEntry && (
-          <div
-            ref={receiptRef}
-            className="fixed -left-[9999px] top-0 w-80 bg-white p-6 border border-neutral-200"
-            style={{ fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}
-          >
-            <div className="text-center border-b-2 border-dashed border-neutral-300 pb-4 mb-4">
-              <h2 className="text-lg font-bold text-neutral-900">Expense Receipt</h2>
-              <p className="text-xs text-neutral-500">Vinod Kumar</p>
-            </div>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-neutral-500">Sector</span><span className="font-medium text-right max-w-[55%]">{latestEntry.sector}</span></div>
-              <div className="flex justify-between"><span className="text-neutral-500">Amount</span><span className="font-bold text-brand-600">{formatCurrency(latestEntry.amount)}</span></div>
-              <div className="flex justify-between"><span className="text-neutral-500">Reason</span><span className="font-medium text-right max-w-[55%]">{latestEntry.reason}</span></div>
-              {latestEntry.transferredTo && (
-                <div className="flex justify-between"><span className="text-neutral-500">Transferred to</span><span className="font-medium text-right max-w-[55%]">{latestEntry.transferredTo}</span></div>
-              )}
-              <div className="flex justify-between"><span className="text-neutral-500">Date</span><span className="font-medium">{formatDateTime(latestEntry.timestamp)}</span></div>
-            </div>
-            <div className="mt-6 pt-4 border-t-2 border-dashed border-neutral-300 text-center text-xs text-neutral-400">
-              Generated by Personal Expenditure Tracker
-            </div>
-          </div>
-        )}
-
-        {/* Daily report card */}
-        <section className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-4">
-          <h2 className="text-sm font-semibold text-neutral-700 mb-3 flex items-center gap-2">
-            <Calendar size={16} /> Daily Report
-          </h2>
-          <DailyReport entries={entries} sectors={sectors} onShare={shareEntry} />
+        <section>
+          <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3">Receipt Preview</h2>
+          <ReceiptCard entry={latestEntry} ref={receiptRef} />
         </section>
 
-        {/* Filters */}
-        <section className="flex items-center gap-2 overflow-x-auto hide-scrollbar py-1">
-          {[
-            { key: 'today', label: 'Today' },
-            { key: 'week', label: 'This Week' },
-            { key: 'month', label: 'This Month' },
-            { key: 'custom', label: 'Custom' },
-          ].map((p) => (
-            <button
-              key={p.key}
-              onClick={() => setFilterPreset(p.key)}
-              className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
-                filterPreset === p.key
-                  ? 'bg-neutral-900 text-white border-neutral-900'
-                  : 'bg-white text-neutral-700 border-neutral-200 hover:border-neutral-400'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
+        <section className="bg-white rounded-3xl shadow-sm border border-slate-100 p-5">
+          <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3">Daily Report</h2>
+          <DailyReport entries={entries} sectors={sectors} />
         </section>
+
+        <FilterTabs active={filterPreset} onChange={setFilterPreset} />
 
         {filterPreset === 'custom' && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <input
               type="date"
               value={customStart}
               onChange={(e) => setCustomStart(e.target.value)}
-              className="flex-1 px-3 py-2 rounded-xl border border-neutral-200 text-sm"
+              className="flex-1 px-4 py-3 rounded-2xl bg-white border border-slate-200 text-sm focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none"
             />
-            <span className="text-neutral-400">to</span>
+            <span className="text-slate-400 text-sm">to</span>
             <input
               type="date"
               value={customEnd}
               onChange={(e) => setCustomEnd(e.target.value)}
-              className="flex-1 px-3 py-2 rounded-xl border border-neutral-200 text-sm"
+              className="flex-1 px-4 py-3 rounded-2xl bg-white border border-slate-200 text-sm focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none"
             />
           </div>
         )}
 
-        {/* Breakdown */}
-        {totalsBySector.length > 0 && (
-          <section className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-4">
-            <h2 className="text-sm font-semibold text-neutral-700 mb-3">Breakdown</h2>
-            <div className="space-y-2">
-              {totalsBySector.map(([sector, amount]) => (
-                <div key={sector} className="flex justify-between items-center">
-                  <span className="text-sm text-neutral-700">{sector}</span>
-                  <span className="text-sm font-semibold">{formatCurrency(amount)}</span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 pt-3 border-t border-neutral-100 flex justify-between items-center">
-              <span className="font-semibold">Total</span>
-              <span className="font-bold text-brand-600">{formatCurrency(total)}</span>
-            </div>
-          </section>
-        )}
+        <Breakdown totalsBySector={totalsBySector} total={total} />
 
-        {/* History */}
         <section>
-          <h2 className="text-sm font-semibold text-neutral-700 mb-3 flex items-center gap-2">
-            <History size={16} /> History
-          </h2>
-          {groupedHistory.length === 0 ? (
-            <p className="text-center text-neutral-400 py-10 text-sm">No expenses in this range.</p>
-          ) : (
-            <div className="space-y-4">
-              {groupedHistory.map(([day, items]) => (
-                <div key={day} className="space-y-2">
-                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide pl-1">
-                    {formatDate(items[0].timestamp)}
-                  </p>
-                  <div className="bg-white rounded-2xl shadow-sm border border-neutral-100 overflow-hidden">
-                    {items.map((entry) => (
-                      <div
-                        key={entry.id}
-                        className="flex items-center justify-between p-4 border-b border-neutral-100 last:border-0"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-neutral-900 truncate">{entry.reason}</p>
-                          <p className="text-xs text-neutral-500 truncate">{entry.sector}{entry.transferredTo ? ` · ${entry.transferredTo}` : ''}</p>
-                        </div>
-                        <div className="flex items-center gap-3 ml-2">
-                          <p className="font-bold text-brand-600 whitespace-nowrap">{formatCurrency(entry.amount)}</p>
-                          <button
-                            onClick={() => handleSharePast(entry)}
-                            className="p-2 rounded-full bg-neutral-100 text-neutral-700 hover:bg-brand-50 hover:text-brand-600 transition-colors"
-                            aria-label="Share"
-                          >
-                            <Share size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(entry.id)}
-                            className="p-2 rounded-full bg-neutral-100 text-neutral-700 hover:bg-red-50 hover:text-red-600 transition-colors"
-                            aria-label="Delete"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3">History</h2>
+          <History entries={filteredEntries} onShare={handleSharePast} onDelete={handleDelete} />
         </section>
       </main>
-    </div>
-  )
-}
-
-function DailyReport({ entries, sectors, onShare }) {
-  const today = useMemo(() => {
-    return entries.filter((e) => isSameDay(e.timestamp, new Date()))
-  }, [entries])
-
-  const todayTotal = today.reduce((sum, e) => sum + Number(e.amount), 0)
-  const breakdown = useMemo(() => {
-    const map = {}
-    for (const s of sectors) map[s] = 0
-    for (const e of today) map[e.sector] = (map[e.sector] || 0) + Number(e.amount)
-    return Object.entries(map).filter(([_, v]) => v > 0)
-  }, [today, sectors])
-
-  if (today.length === 0) {
-    return <p className="text-sm text-neutral-400">No expenses recorded today yet.</p>
-  }
-
-  const text = `*Daily Expense Report — ${new Date().toLocaleDateString('en-IN')}*\n\n${breakdown
-    .map(([s, a]) => `${s}: ${formatCurrency(a)}`)
-    .join('\n')}\n\n*Total: ${formatCurrency(todayTotal)}*`
-
-  return (
-    <div className="space-y-3">
-      <div className="bg-neutral-50 rounded-xl p-3 text-sm space-y-1">
-        {breakdown.map(([sector, amount]) => (
-          <div key={sector} className="flex justify-between">
-            <span className="text-neutral-600">{sector}</span>
-            <span className="font-medium">{formatCurrency(amount)}</span>
-          </div>
-        ))}
-        <div className="pt-2 border-t border-neutral-200 flex justify-between font-bold">
-          <span>Total</span>
-          <span className="text-brand-600">{formatCurrency(todayTotal)}</span>
-        </div>
-      </div>
-      <button
-        onClick={async () => {
-          if (navigator.share) {
-            try {
-              await navigator.share({ text })
-              return
-            } catch {}
-          }
-          window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
-        }}
-        className="w-full py-3 rounded-xl border border-brand-200 bg-brand-50 text-brand-700 font-medium flex items-center justify-center gap-2 hover:bg-brand-100 transition-colors"
-      >
-        <ArrowUpRight size={18} /> Share today's report
-      </button>
     </div>
   )
 }
